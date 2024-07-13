@@ -1,0 +1,7 @@
+**/desktop.ini
+**/Thumbs.db
+**/.DS_Store
+
+/.venv/
+/.idea/
+NOTES.txt
