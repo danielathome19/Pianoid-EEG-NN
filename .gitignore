@@ -4,4 +4,7 @@
 
 /.venv/
 /.idea/
+/data/epochs/
 NOTES.txt
+OLD.txt
+commitdata.ps1

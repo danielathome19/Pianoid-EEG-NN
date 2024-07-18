@@ -2,6 +2,7 @@ import mne
 import librosa
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 
@@ -33,6 +34,11 @@ def split_edf(file_path, output_dir, part_duration_sec):
         part_raw.save(part_filename, overwrite=True)
 
 
+def split_all_edf_parts():
+    for j in range(1, 22):
+        split_edf(Path(f"data/eeg/sub-{j:02d}_task-classicalMusic_eeg.edf"), Path(f"data/eeg/sub-{j:02d}"), 300)
+
+
 def load_edf_from_parts(directory, pattern):
     """
     Load and concatenate EDF parts from a directory.
@@ -59,14 +65,6 @@ def load_edf_from_parts(directory, pattern):
     return raw_concat
 
 
-def extract_audio_features(audio_path, sr=22050):
-    y, sr = librosa.load(audio_path, sr=sr)
-    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-    # Normalize MFCCs
-    mfccs = (mfccs - np.mean(mfccs, axis=1, keepdims=True)) / np.std(mfccs, axis=1, keepdims=True)
-    return mfccs.T  # Transpose to have time steps as rows for LSTM
-
-
 def load_eeg_data(data_dir, subject_id):
     return load_edf_from_parts(data_dir/'eeg'/f'sub-{subject_id:02d}', f'sub-{subject_id:02d}*part*.fif')
     # return mne.io.read_raw_edf(data_dir/'eeg'/ f'sub-{subject_id:02d}_task-classicalMusic_eeg.edf', preload=True)
@@ -77,5 +75,5 @@ def load_eeg_events(data_dir, subject_id):
 
 
 if __name__ == "__main__":
-    for j in range(1, 22):
-        split_edf(Path(f"data/eeg/sub-{j:02d}_task-classicalMusic_eeg.edf"), Path(f"data/eeg/sub-{j:02d}"), 300)
+    print("Hello, world!")
+    # split_all_edf_parts()

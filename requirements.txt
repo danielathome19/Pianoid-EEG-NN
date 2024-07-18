@@ -6,3 +6,5 @@ pyorganoid>=0.1.2
 tensorflow~=2.15.0
 matplotlib~=3.9.1
 scipy~=1.14.0
+pydot~=3.0.1
+graphviz~=0.20.3
