@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import pyorganoid as po
 import tensorflow as tf
-import concurrent.futures
 import matplotlib.pyplot as plt
 from utils import *
 from pathlib import Path
@@ -35,17 +34,30 @@ def preprocess_and_epoch(subject_id):
     event_id = {str(evt): evt for evt in np.unique(events_df['trial_type'])}
     epochs = mne.Epochs(raw, events_array, event_id=event_id, tmin=-0.2, tmax=10.0, baseline=(None, 0),
                         preload=True, event_repeated='merge')
-    return epochs
+
+    # Save epoch temporarily
+    epochs.save(data_dir / 'epochs' / f'sub-{subject_id}_epochs-epo.fif', overwrite=True)
+
+
+def process_all_subjects():
+    for subject_id in range(1, 22):
+        print("Preprocessing and epoching subject", subject_id)
+        preprocess_and_epoch(subject_id)
+    print("Finished preprocessing and epoching all subjects. Combining epochs...")
 
 
 def combine_epochs():
-    all_epochs = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-        futures = [executor.submit(preprocess_and_epoch, subject_id) for subject_id in range(1, 22)]
-        for future in concurrent.futures.as_completed(futures):
-            all_epochs.append(future.result())
+    # epochs_files = list(data_dir.glob('epochs/sub-*_epochs-epo.fif'))
+    # all_epochs = [mne.read_epochs(f) for f in epochs_files]
+    # combined_epochs = mne.concatenate_epochs(all_epochs)
+    # combined_epochs.save(data_dir / 'epochs' / 'combined_epochs-epo.fif', overwrite=True)
+
+    # Combine epochs for subjects 1-5 only (because each subject's epoch data is ~3-5 GB in total)
+    epochs_files = list(data_dir.glob('epochs/sub-[1-5]_epochs-epo.fif'))
+    all_epochs = [mne.read_epochs(f) for f in epochs_files]
     combined_epochs = mne.concatenate_epochs(all_epochs)
-    combined_epochs.save(data_dir / 'epochs' / 'combined_epochs-epo.fif', overwrite=True)
+    combined_epochs.save(data_dir / 'epochs' / 'combined_epochs-1to5-epo.fif', overwrite=True)
+    print("Finished combining epochs.")
 
 
 def train_model():
@@ -54,5 +66,6 @@ def train_model():
 
 if __name__ == "__main__":
     print("Hello, world!")
-    # train_model()
+    # process_all_subjects()
     combine_epochs()
+    # train_model()
