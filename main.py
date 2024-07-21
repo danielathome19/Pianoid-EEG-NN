@@ -2,6 +2,7 @@ import gc
 import os
 import mne
 import sys
+import pickle
 import librosa
 import logging
 import warnings
@@ -14,6 +15,7 @@ from utils import *
 from pathlib import Path
 from scipy.signal import welch
 from tensorflow.keras.utils import plot_model
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import callbacks, layers, models, optimizers, regularizers
 
@@ -28,6 +30,7 @@ for gpu in gpus:
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 data_dir = Path('data')
 
 
@@ -62,21 +65,6 @@ def process_all_subjects():
     print("Finished preprocessing and epoching all subjects.")
 
 
-def combine_epochs():
-    """Deprecated due to system memory constraints."""
-    # epochs_files = list(data_dir.glob('epochs/sub-*_epochs-epo.fif'))
-    # all_epochs = [mne.read_epochs(f) for f in epochs_files]
-    # combined_epochs = mne.concatenate_epochs(all_epochs)
-    # combined_epochs.save(data_dir / 'epochs' / 'combined_epochs-epo.fif', overwrite=True)
-    # Combine epochs for subjects 1-5 only (because each subject's epoch data is ~3-5 GB in total)
-    # epochs_files = list(data_dir.glob('epochs/sub-[1-5]_epochs-epo.fif'))
-    # all_epochs = [mne.read_epochs(f) for f in epochs_files]
-    # combined_epochs = mne.concatenate_epochs(all_epochs)
-    # combined_epochs.save(data_dir / 'epochs' / 'combined_epochs-1to5-epo.fif', overwrite=True)
-    # print("Finished combining epochs.")
-    pass
-
-
 def extract_audio_features():
     audio_features = {}
     audio_files = list(data_dir.glob('mp3/*.mp3'))
@@ -101,7 +89,14 @@ def load_eeg_data_memmapped(file_path):
     return data, epochs.times
 
 
-def data_generator(eeg_files, audio_features, batch_size=32, verbose=False):
+def normalize_data(data, scaler):
+    # Assume data shape is (batch_size, channels, features)
+    # Reshape data to (batch_size * channels, features) for scaling
+    shaped_data = data.reshape(-1, data.shape[-1])
+    return scaler.transform(shaped_data).reshape(data.shape)
+
+
+def data_generator(eeg_files, audio_features, batch_size=32, verbose=False, scaler=None):
     while True:  # Infinite loop for keras fit_generator
         for eeg_file in eeg_files:
             subject_id = int(eeg_file.stem.split('_')[0].split('-')[1])
@@ -112,6 +107,8 @@ def data_generator(eeg_files, audio_features, batch_size=32, verbose=False):
                     if verbose:
                         print(f"Skipping {eeg_file} due to missing audio features.")
                     continue
+                if scaler:
+                    eeg_data = normalize_data(eeg_data, scaler)
                 indices = np.arange(len(eeg_data))
                 np.random.shuffle(indices)
                 for start_idx in range(0, len(eeg_data), batch_size):
@@ -132,6 +129,21 @@ def data_generator(eeg_files, audio_features, batch_size=32, verbose=False):
     pass
 
 
+def fit_scaler():
+    print("Fitting the StandardScaler...")
+    scaler = StandardScaler()
+    epochs_files = [Path(f"data/epochs/sub-{i}_epochs-epo.fif") for i in range(1, 22)]
+    for file_path in epochs_files:
+        print(f"Fitting scaler for {file_path}")
+        data, _ = load_eeg_data_memmapped(file_path)
+        # Reshape data to 2D (samples, features) if necessary
+        reshaped_data = data.reshape(-1, data.shape[-1])
+        scaler.partial_fit(reshaped_data)
+    with open('weights/scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f)
+    pass
+
+
 def build_model(input_shape, units=64, dropout_rate=0.5, recurrent_dropout=0.5, num_classes=1,
                 final_activation='linear', loss=None, metrics=None, l2_reg=0.01):
     if final_activation is None:
@@ -141,23 +153,34 @@ def build_model(input_shape, units=64, dropout_rate=0.5, recurrent_dropout=0.5, 
     if metrics is None:
         metrics = ['accuracy']
     model = models.Sequential([
-        layers.Bidirectional(layers.LSTM(units, input_shape=input_shape, recurrent_dropout=recurrent_dropout,
-                                         return_sequences=True, kernel_regularizer=regularizers.l2(l2_reg))),
-        layers.BatchNormalization(),
-        layers.Dropout(dropout_rate),
-        layers.Bidirectional(layers.LSTM(units, return_sequences=False, kernel_regularizer=regularizers.l2(l2_reg))),
-        layers.BatchNormalization(),
-        layers.Dropout(dropout_rate),
-        layers.Dense(units, activation='relu', kernel_regularizer=regularizers.l2(l2_reg)),
-        layers.BatchNormalization(),
+        # layers.Bidirectional(layers.GRU(units, input_shape=input_shape, recurrent_dropout=recurrent_dropout,
+        #                                 return_sequences=True, kernel_regularizer=regularizers.l2(l2_reg))),
+        # # layers.BatchNormalization(),
+        # layers.Dropout(dropout_rate),
+        # layers.Bidirectional(layers.GRU(units, return_sequences=False, kernel_regularizer=regularizers.l2(l2_reg),
+        #                                 dropout=dropout_rate, recurrent_dropout=recurrent_dropout)),
+        # # layers.BatchNormalization(),
+        # # layers.Dropout(dropout_rate),
+        # layers.Dense(units, activation='relu', kernel_regularizer=regularizers.l2(l2_reg)),
+        # layers.BatchNormalization(),
+        # layers.Dropout(dropout_rate),
+        # layers.Dense(num_classes, activation=final_activation)
+        layers.GRU(units, input_shape=input_shape, return_sequences=True,
+                   dropout=recurrent_dropout, recurrent_dropout=recurrent_dropout,
+                   kernel_regularizer=regularizers.l2(l2_reg)),
+        layers.GRU(units, return_sequences=False, dropout=recurrent_dropout,
+                   recurrent_dropout=recurrent_dropout, kernel_regularizer=regularizers.l2(l2_reg)),
+        layers.Dense(units, activation='relu'),
         layers.Dropout(dropout_rate),
         layers.Dense(num_classes, activation=final_activation)
     ])
-    lr_schedule = optimizers.schedules.ExponentialDecay(initial_learning_rate=1e-3, decay_steps=10000, decay_rate=0.9)
     early_stopping = callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-    optimizer = optimizers.Adam(learning_rate=lr_schedule)
+    reduce_lr = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.001)
+    checkpoint = callbacks.ModelCheckpoint('gru_model_best.h5', monitor='val_loss', save_best_only=True)
+    lr_schedule = optimizers.schedules.ExponentialDecay(initial_learning_rate=1e-4, decay_steps=10000, decay_rate=0.9)
+    optimizer = optimizers.Nadam(learning_rate=lr_schedule, clipnorm=1.0, beta_1=0.9, beta_2=0.999)
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    return model, [early_stopping]
+    return model, [early_stopping, reduce_lr, checkpoint]
 
 
 def train_model():
@@ -169,28 +192,31 @@ def train_model():
     sample_data = sample_epochs.get_data(copy=False)
     input_shape = sample_data.shape[1:]
 
+    batch_size = 32
+    # scaler = pickle.load(open('weights/scaler.pkl', 'rb'))
     audio_features = extract_audio_features()
     eeg_files = [Path(f"data/epochs/sub-{i}_epochs-epo.fif") for i in range(1, 22)]
-    train_files, val_files = train_test_split(eeg_files, test_size=0.2, random_state=42)
-    train_gen = data_generator(train_files, audio_features, batch_size=32)
-    val_gen = data_generator(val_files, audio_features, batch_size=32)
+    train_files, val_files = train_test_split(eeg_files, test_size=0.15, random_state=42)
+    train_gen = data_generator(train_files, audio_features, batch_size=batch_size)  # , scaler=scaler)
+    val_gen = data_generator(val_files, audio_features, batch_size=batch_size)  # , scaler=scaler)
 
-    model, m_callbacks = build_model(input_shape, units=128, dropout_rate=0.5, loss='mse', metrics=['mae'],
-                                     recurrent_dropout=0.25, num_classes=1)  # 1 class for continuous valence
+    model, m_callbacks = build_model(input_shape, units=32, dropout_rate=0.1, loss='mse', metrics=['mae'],
+                                     recurrent_dropout=0.1)  # 1 class for continuous valence; drop=0.5, rec_drop=0.25
     model.build(input_shape=(None,) + input_shape)  # Apply input shape to model for summary (because of Bidirectional)
     model.summary()
     plot_model(model, show_shapes=True, expand_nested=True,
-               to_file='images/lstm_model.png', show_layer_activations=True, dpi=300)
+               to_file='images/gru_model.png', show_layer_activations=True, dpi=300)
 
     gc.disable()  # Disable garbage collection to prevent memory issues and stalling during training
-    history = model.fit(train_gen, steps_per_epoch=100, epochs=25, verbose=1,
+    history = model.fit(train_gen, steps_per_epoch=100, epochs=10, verbose=1,
                         callbacks=m_callbacks, validation_data=val_gen, validation_steps=25)
-    model.save('weights/lstm_model.h5')
+    model.save('weights/gru_model.h5')
     gc.enable()
 
     for key in ['loss', 'mae']:
         plt.plot(history.history[key], label=f'Training {key.title()}')
         plt.plot(history.history[f'val_{key}'], label=f'Validation {key.title()}')
+        plt.legend()
         plt.title(f'Model {key.title()}')
         plt.ylabel(key.title())
         plt.xlabel('Epoch')
@@ -236,5 +262,6 @@ if __name__ == "__main__":
     print("Hello, world!")
     # process_all_subjects()
     # combine_epochs()
+    # fit_scaler()
     train_model()
-    test_model()
+    # test_model()
