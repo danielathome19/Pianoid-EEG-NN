@@ -12,6 +12,7 @@ import pyorganoid as po
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from utils import *
+from organoid import *
 from pathlib import Path
 from scipy.signal import welch
 from tensorflow.keras.utils import plot_model
@@ -291,10 +292,42 @@ def test_model():
     print("Testing completed and plots saved.")
 
 
+def simulate_organoid(mp3_filepath=None):
+    print("Simulating the organoid...")
+    model_path = "weights/lstm_model.h5"
+    ml_model = po.TFModel(model_path, input_shape=(None, 20, 1))
+
+    environment = AudioEnvironment()
+    organoid = EEGOrganoid(environment, ml_model, num_cells=47)  # Corresponding to 47 EEG channels from the dataset
+    organoid.plot_organoid("images/eeg_organoid.png", show_properties=True, dpi=300)
+
+    mp3_file = mp3_filepath or data_dir/'mp3/p1_chopin-n10-op12-bertoglio.mp3'
+    simulator = AudioScheduler(organoid)
+    simulator.simulate(mp3_file)
+
+    organoid.plot_simulation_history('Frequency Over Time', 'Frequency',
+                                     filename='images/eeg_organoid_simulation.png', dpi=300)
+    
+    # Create EEG frequency plot
+    n_cells = len(organoid.get_cells())
+    fig, axes = plt.subplots(n_cells, 1, figsize=(12, 36), sharex=True)
+    for i, cell in enumerate(organoid.get_cells()):
+        axes[i].plot(cell.get_history(), color='blue')
+        axes[i].set_ylabel(f'Cell {i+1}', rotation=0, labelpad=20, ha='right')
+        axes[i].set_yticks([])  # Remove frequency labels
+        axes[i].spines['top'].set_visible(False)
+        axes[i].spines['right'].set_visible(False)
+        axes[i].spines['left'].set_visible(False)
+    axes[-1].set_xlabel('Time Steps', fontsize=14, labelpad=10)
+    plt.suptitle('Organoid Cell Activity Over Time', fontsize=16)
+    plt.savefig('images/eeg_organoid_frequency_over_time.png', dpi=300)
+
+
 if __name__ == "__main__":
     print("Hello, world!")
     # process_all_subjects()
     # combine_epochs()
     # fit_scaler()
     # train_model()
-    test_model()
+    # test_model()
+    simulate_organoid()
