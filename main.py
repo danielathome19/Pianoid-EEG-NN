@@ -71,7 +71,7 @@ def extract_audio_features():
     for i, file_name in enumerate(audio_files):
         y, sr = librosa.load(file_name, sr=22050)
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20, hop_length=512)
-        # mfccs = (mfccs - np.mean(mfccs, axis=1, keepdims=True)) / np.std(mfccs, axis=1, keepdims=True)  # Normalize
+        # mfcc = (mfcc - np.mean(mfcc, axis=1, keepdims=True)) / np.std(mfcc, axis=1, keepdims=True)  # Normalize
         audio_features[i+1] = mfcc.T  # Transpose to align time steps as rows
     return audio_features
 
@@ -155,8 +155,9 @@ def build_model(audio_input_shape, eeg_output_shape, units=64, dropout_rate=0.5,
                 loss='mse', metrics=('mae',), l2_reg=0.01):
     model = models.Sequential([
         layers.Input(shape=audio_input_shape, name='audio_input'),
-        layers.LSTM(units, dropout=dropout_rate, recurrent_dropout=recurrent_dropout, return_sequences=True),
-        layers.LSTM(units, dropout=dropout_rate, recurrent_dropout=recurrent_dropout),
+        layers.Bidirectional(layers.LSTM(units, dropout=dropout_rate, recurrent_dropout=recurrent_dropout,
+                                         return_sequences=True)),
+        layers.Bidirectional(layers.LSTM(units, dropout=dropout_rate, recurrent_dropout=recurrent_dropout)),
         layers.Dense(128, activation='relu', kernel_regularizer=regularizers.l2(l2_reg)),
         layers.Dropout(dropout_rate),
         layers.Dense(64, activation='relu', kernel_regularizer=regularizers.l2(l2_reg)),
@@ -205,14 +206,16 @@ def train_model():
     model.save('weights/lstm_model.h5')
     gc.enable()
 
-    for key in history.history.keys():
-        plt.plot(history.history[key], label=f'Training {key.title()}')
-        plt.plot(history.history[f'val_{key}'], label=f'Validation {key.title()}')
+    for key in ['loss', 'mae']:
+        key = key.title() if key == 'loss' else key.upper()
+        plt.figure(figsize=(12, 6))
+        plt.plot(history.history[key.lower()], label=f'Training {key}')
+        plt.plot(history.history[f'val_{key.lower()}'], label=f'Validation {key}')
         plt.legend()
-        plt.title(f'Model {key.title()}')
-        plt.ylabel(key.title())
+        plt.title(f'Model {key}')
+        plt.ylabel(key)
         plt.xlabel('Epoch')
-        plt.savefig(f'images/model_{key}_history.png')
+        plt.savefig(f'images/model_{key.lower()}_history.png')
         plt.show()
     pass
 
