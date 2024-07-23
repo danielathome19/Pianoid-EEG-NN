@@ -5,6 +5,9 @@
 /.venv/
 /.idea/
 /data/epochs/
+/weights/
+
+/images/eeg_organoid_simulation.png
 NOTES.txt
 OLD.txt
 HISTORY.txt
