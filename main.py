@@ -65,7 +65,12 @@ def process_all_subjects():
     print("Finished preprocessing and epoching all subjects.")
 
 
-def extract_audio_features():
+def extract_audio_features(file=None):
+    if file is not None:
+        # Extract audio features for a single file
+        y, sr = librosa.load(file, sr=22050)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20, hop_length=512)
+        return mfcc.T
     audio_features = {}
     audio_files = list(data_dir.glob('mp3/*.mp3'))
     for i, file_name in enumerate(audio_files):
@@ -180,9 +185,15 @@ def train_model():
     # Load a sample epoch to determine input shape for the model
     # This shape of the data typically returns (n_epochs, n_channels, n_times)
     # For input shape to LSTM, we care about (n_channels, n_times) for a single epoch
-    sample_epochs = mne.read_epochs(data_dir/'epochs'/'sub-1_epochs-epo.fif', preload=True)
-    sample_data = sample_epochs.get_data(copy=False)
-    eeg_output_shape = sample_data.shape[1:]  # (n_channels, n_times)
+    if not os.path.exists('weights/eeg_output_shape.pkl'):
+        sample_epochs = mne.read_epochs(data_dir/'epochs'/'sub-1_epochs-epo.fif', preload=True)
+        sample_data = sample_epochs.get_data(copy=False)
+        eeg_output_shape = sample_data.shape[1:]  # (n_channels, n_times)
+        with open('weights/eeg_output_shape.pkl', 'wb') as f:
+            pickle.dump(eeg_output_shape, f)
+    else:
+        with open('weights/eeg_output_shape.pkl', 'rb') as f:
+            eeg_output_shape = pickle.load(f)
 
     audio_features = extract_audio_features()
     audio_input_shape = (audio_features[1].shape[0], audio_features[1].shape[1])
@@ -222,35 +233,62 @@ def train_model():
 
 def test_model():
     print("Testing the model...")
-    audio_features = extract_audio_features()
-    eeg_files = [Path(f"data/epochs/sub-{i}_epochs-epo.fif") for i in range(1, 22)]
-    train_files, val_files = train_test_split(eeg_files, test_size=0.2, random_state=42)
-    _train_gen = data_generator(train_files, audio_features, batch_size=32)
-    val_gen = data_generator(val_files, audio_features, batch_size=32)
-
-    # Time Series Plot
     model = models.load_model('weights/lstm_model.h5')
-    eeg_data, audio_data = next(val_gen)  # Get a batch of data
-    predictions = model.predict(eeg_data)
-    plt.figure(figsize=(12, 6))  # Plot the first sample in the batch
-    plt.plot(audio_data[0], label='Actual')
-    plt.plot(predictions[0], label='Predicted')
+    mp3_file = data_dir/'mp3/p1_chopin-n10-op12-bertoglio.mp3'
+    mp3_features = extract_audio_features(file=mp3_file)
+    mp3_features = np.expand_dims(mp3_features, axis=-1) if mp3_features.ndim == 2 else mp3_features  # Ensure 3D shape
+    predicted_eeg = model.predict(np.expand_dims(mp3_features, axis=0))  # Predict EEG activities
+
+    # Load true EEG data for comparison
+    true_eeg = mne.read_epochs(data_dir/'epochs/sub-1_epochs-epo.fif', preload=True).get_data(copy=False)
+
+    # Reshape and trim true_eeg to match the predicted shape (batch_size, n_channels, n_times)
+    true_eeg = true_eeg[:, :, :predicted_eeg.shape[2]]  # Ensure it matches the time steps
+    true_eeg = true_eeg.mean(axis=0, keepdims=True)  # Compute the average across epochs
+
+    # Calculate the channel-wise correlation between predicted and true EEG
+    corr = np.corrcoef(predicted_eeg.flatten(), true_eeg.flatten())[0, 1]
+    print(f"Correlation between predicted and true EEG: {corr:.4f}")  # rho=0.5073, future work: augment dataset
+
+    scaler = StandardScaler()
+    scaled_predicted_eeg_norm = (scaler.fit_transform(predicted_eeg[0].reshape(-1, predicted_eeg.shape[2]))
+                                 .reshape(predicted_eeg[0].shape))
+    scaled_true_eeg_norm = scaler.fit_transform(true_eeg[0].reshape(-1, true_eeg.shape[2])).reshape(true_eeg[0].shape)
+
+    # Calculate the power spectral density of the predicted and true EEG
+    f, pxx_predicted = welch(scaled_predicted_eeg_norm.flatten(), fs=1000, nperseg=256)
+    f, pxx_true = welch(scaled_true_eeg_norm.flatten(), fs=1000, nperseg=256)
+
+    # Plot the power spectral density of the predicted and true EEG
+    plt.figure(figsize=(12, 6))
+    plt.plot(f, pxx_true, label='True EEG')
+    plt.plot(f, pxx_predicted, label='Predicted EEG')
     plt.legend()
-    plt.title('Actual vs. Predicted EEG Signal')
+    plt.title('Power Spectral Density of Normalized Predicted vs. True EEG Signal')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Power/Frequency (dB/Hz)')
+    plt.savefig('images/psd_predicted_vs_true_eeg.png')
+    plt.show()
+
+    # Calculate the average EEG signal across all channels
+    avg_predicted_eeg = np.mean(predicted_eeg[0], axis=0)
+    avg_true_eeg = np.mean(true_eeg[0], axis=0)
+
+    # Trim values to be between 0 and 0.5 for better visualization
+    avg_predicted_eeg = np.clip(avg_predicted_eeg, -0.01, 0.01)
+    avg_true_eeg = np.clip(avg_true_eeg, -0.01, 0.01)
+
+    # Plot the average predicted EEG vs. true EEG
+    plt.figure(figsize=(12, 6))
+    plt.plot(avg_true_eeg, label='True EEG')
+    plt.plot(avg_predicted_eeg, label='Predicted EEG')
+    plt.legend()
+    plt.title('Average Actual vs. Predicted EEG Signal')
     plt.xlabel('Time')
     plt.ylabel('Signal Value')
-    plt.savefig('images/actual_vs_predicted.png')
+    plt.savefig('images/average_actual_vs_predicted_eeg.png')
     plt.show()
-
-    # Error Distribution
-    errors = np.abs(predictions - audio_data)  # Calculate the absolute errors
-    plt.hist(errors.flatten(), bins=50)
-    plt.title('Error Distribution')
-    plt.xlabel('Absolute Error')
-    plt.ylabel('Frequency')
-    plt.savefig('images/error_distribution.png')
-    plt.show()
-    pass
+    print("Testing completed and plots saved.")
 
 
 if __name__ == "__main__":
@@ -258,5 +296,5 @@ if __name__ == "__main__":
     # process_all_subjects()
     # combine_epochs()
     # fit_scaler()
-    train_model()
-    # test_model()
+    # train_model()
+    test_model()
