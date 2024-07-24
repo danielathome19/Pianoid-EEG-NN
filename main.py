@@ -299,8 +299,7 @@ def simulate_organoid(mp3_filepath=None):
 
     environment = AudioEnvironment()
     organoid = EEGOrganoid(environment, ml_model, num_cells=47)  # Corresponding to 47 EEG channels from the dataset
-    organoid.plot_organoid("images/eeg_organoid.png", show_properties=True, dpi=300)
-
+    organoid.plot_organoid("images/eeg_organoid.png", show_properties=True, dpi=300, truncate_cells=6)
     mp3_file = mp3_filepath or data_dir/'mp3/p1_chopin-n10-op12-bertoglio.mp3'
     simulator = AudioScheduler(organoid)
     simulator.simulate(mp3_file)
