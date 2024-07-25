@@ -95,13 +95,6 @@ def load_eeg_data_memmapped(file_path):
     return data, epochs.times
 
 
-def normalize_data(data, scaler):
-    # Assume data shape is (batch_size, channels, features)
-    # Reshape data to (batch_size * channels, features) for scaling
-    shaped_data = data.reshape(-1, data.shape[-1])
-    return scaler.transform(shaped_data).reshape(data.shape)
-
-
 def data_generator(eeg_files, audio_features, audio_input_shape, batch_size=32, verbose=False, scaler=None):
     while True:  # Infinite loop for keras fit_generator
         for eeg_file in eeg_files:
@@ -113,8 +106,6 @@ def data_generator(eeg_files, audio_features, audio_input_shape, batch_size=32, 
                     if verbose:
                         print(f"Skipping {eeg_file} due to missing audio features.")
                     continue
-                if scaler:
-                    eeg_data = normalize_data(eeg_data, scaler)
                 indices = np.arange(len(eeg_data))
                 np.random.shuffle(indices)
                 for start_idx in range(0, len(eeg_data), batch_size):
@@ -139,21 +130,6 @@ def data_generator(eeg_files, audio_features, audio_input_shape, batch_size=32, 
             except Exception as e:
                 if verbose:
                     print(f"An error occurred while processing {eeg_file}: {e}")
-    pass
-
-
-def fit_scaler():
-    print("Fitting the StandardScaler...")
-    scaler = StandardScaler()
-    epochs_files = [Path(f"data/epochs/sub-{i}_epochs-epo.fif") for i in range(1, 22)]
-    for file_path in epochs_files:
-        print(f"Fitting scaler for {file_path}")
-        data, _ = load_eeg_data_memmapped(file_path)
-        # Reshape data to 2D (samples, features) if necessary
-        reshaped_data = data.reshape(-1, data.shape[-1])
-        scaler.partial_fit(reshaped_data)
-    with open('weights/scaler.pkl', 'wb') as f:
-        pickle.dump(scaler, f)
     pass
 
 
@@ -249,7 +225,7 @@ def test_model():
 
     # Calculate the channel-wise correlation between predicted and true EEG
     corr = np.corrcoef(predicted_eeg.flatten(), true_eeg.flatten())[0, 1]
-    print(f"Correlation between predicted and true EEG: {corr:.4f}")  # rho=0.5073, future work: augment dataset
+    print(f"Correlation between predicted and true EEG: {corr:.4f}")  # r=0.5073, future work: augment dataset
 
     scaler = StandardScaler()
     scaled_predicted_eeg_norm = (scaler.fit_transform(predicted_eeg[0].reshape(-1, predicted_eeg.shape[2]))
