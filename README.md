@@ -4,7 +4,7 @@ These signal responses are interfaced through a simulated organoid (using the no
 This project was designed to demonstrate the capabilities of `pyorganoid` and its usage in studying the new field of Organoid Intelligence.
 
 To find out more, check out the provided research paper:
-  * "Simulation of Neural Responses to Classical Music Using Organoid Intelligence Methods" (DOI: [TBD](https://doi.org/TBD))
+  * "Simulation of Neural Responses to Classical Music Using Organoid Intelligence Methods" (DOI: [10.48550/arxiv.2407.18413](https://doi.org/10.48550/arxiv.2407.18413))
 
 # Usage
 For data used in my experiments:
