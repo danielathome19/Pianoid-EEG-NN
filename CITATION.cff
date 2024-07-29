@@ -9,7 +9,7 @@ type: software
 version: 1.0.0
 doi: 10.48550/arxiv.2407.18413
 license: Apache-2.0
-license-url: "https://github.com/danielathome19/Pianoid-EEG-NN/blob/main/LICENSE.md"
+license-url: "https://github.com/danielathome19/Pianoid-EEG-NN/blob/master/LICENSE.md"
 date-released: 2024-07-25
 url: "https://github.com/danielathome19/Pianoid-EEG-NN"
 preferred-citation:
