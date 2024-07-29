@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Szelogowski"
+  given-names: "Daniel"
+  orcid: "https://orcid.org/0000-0002-0350-5771"
+title: "Pianoid-EEG-NN: A Bidirectional LSTM Network and EEG-Response Organoid for simulating neural responses to classical piano music."
+type: software
+version: 1.0.0
+doi: 10.48550/arxiv.2407.18413
+license: Apache-2.0
+license-url: "https://github.com/danielathome19/Pianoid-EEG-NN/blob/main/LICENSE.md"
+date-released: 2024-07-25
+url: "https://github.com/danielathome19/Pianoid-EEG-NN"
+preferred-citation:
+  authors:
+  - family-names: "Szelogowski"
+    given-names: "Daniel"
+    orcid: "https://orcid.org/0000-0002-0350-5771"
+  title: "Simulation of Neural Responses to Classical Music Using Organoid Intelligence Methods"
+  type: preprint
+  version: 1.0.0
+  doi: 10.48550/arxiv.2407.18413
+  date-released: 2024-07-25
+  license: Apache-2.0
+  url: "https://github.com/danielathome19/Pianoid-EEG-NN"

@@ -26,6 +26,6 @@ Please use the issue tracker for the following purpose:
   * To suggest new features or structures or applications.
   
 # License
-The code is licensed under CC0 License 1.0.
+The code is licensed under Apache 2.0.
 
 The dataset was compiled from free and open sources with respect to the original file creators and sequencers. This work is purely for educational and research purposes, and no copyright is claimed on any files contained within the dataset.
