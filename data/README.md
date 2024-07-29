@@ -12,4 +12,5 @@ Data recorded in 2016
 
 Published in 2019
 
+
 [1] Daly, I., Williams, D., Hwang, F., Kirke, A., Miranda, E. R., & Nasuto, S. J. (2019). Electroencephalography reflects the activity of sub-cortical brain regions during approach-withdrawal behaviour while listening to music. Scientific Reports, 9(1), 9415. https://doi.org/10.1038/s41598-019-45105-2
