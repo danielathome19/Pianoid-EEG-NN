@@ -29,3 +29,34 @@ Please use the issue tracker for the following purpose:
 The code is licensed under Apache 2.0.
 
 The dataset was compiled from free and open sources with respect to the original file creators and sequencers. This work is purely for educational and research purposes, and no copyright is claimed on any files contained within the dataset.
+
+
+# Citation
+
+If you use this code in your research, please cite the following paper:
+
+```bibtex
+@misc{Szelogowski_Simulation_of_Neural_Responses_Using_OI_2024,
+ author = {Szelogowski, Daniel},
+ doi = {10.48550/arxiv.2407.18413},
+ month = jul,
+ title = {{Simulation of Neural Responses to Classical Music Using Organoid Intelligence Methods}},
+ url = {https://github.com/danielathome19/Pianoid-EEG-NN},
+ year = {2024}
+}
+```
+
+or as the project repository:
+
+```bibtex
+@software{Szelogowski_Pianoid_2024,
+ author = {Szelogowski, Daniel},
+ doi = {10.48550/arxiv.2407.18413},
+ month = {jul},
+ title = {{Pianoid-EEG-NN}},
+ license = {Apache-2.0},
+ url = {https://github.com/danielathome19/Pianoid-EEG-NN},
+ version = {1.0.0},
+ year = {2024}
+}
+```
