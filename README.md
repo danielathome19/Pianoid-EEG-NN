@@ -39,14 +39,14 @@ If you use this code in your research, please cite the following paper:
 @misc{Szelogowski_Simulation_of_Neural_Responses_Using_OI_2024,
  author = {Szelogowski, Daniel},
  doi = {10.48550/arxiv.2407.18413},
- month = jul,
+ month = {jul},
  title = {{Simulation of Neural Responses to Classical Music Using Organoid Intelligence Methods}},
  url = {https://github.com/danielathome19/Pianoid-EEG-NN},
  year = {2024}
 }
 ```
 
-or as the project repository:
+or the project repository:
 
 ```bibtex
 @software{Szelogowski_Pianoid_2024,
